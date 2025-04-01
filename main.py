@@ -3,76 +3,100 @@ from sqlalchemy import create_engine
 from datetime import datetime
 import csv
 
-engine = create_engine('sqlite:///database.db')
-meta = MetaData()
+def create_tables():
+    engine = create_engine('sqlite:///database.db')
+    meta = MetaData()
 
-# Definiujemy strukturę tabel:
-stations = Table(
-    "stations",
-    meta,
-    Column("station", String, primary_key = True), 
-    Column("latitude", Float),
-    Column("longitude", Float),
-    Column("elevation", Float),
-    Column("name", String),
-    Column("country", String),
-    Column("state", String), 
-)
+    # Definiujemy strukturę tabel:
+    stations = Table(
+        "stations",
+        meta,
+        Column("station", String, primary_key = True), 
+        Column("latitude", Float),
+        Column("longitude", Float),
+        Column("elevation", Float),
+        Column("name", String),
+        Column("country", String),
+        Column("state", String), 
+    )
 
-measure = Table(
-    "measure",
-    meta,
-    Column("station", String),
-    Column("date", Date),
-    Column("precip", Float),
-    Column("tobs", Integer),
-)
+    measure = Table(
+        "measure",
+        meta,
+        Column("station", String),
+        Column("date", Date),
+        Column("precip", Float),
+        Column("tobs", Integer),
+    )
 
-meta.create_all(engine)
-print(f"Wygenerowano tabele: {engine.table_names()}")
+    meta.create_all(engine)
+    print(f"Wygenerowano tabele: {engine.table_names()}")
 
-csv_db_stations = 'clean_stations.csv'
+    return engine, engine.connect(), stations, measure
 
-with open(csv_db_stations, newline='', encoding='utf-8') as csv_stations:
-    reader = csv.DictReader(csv_stations)
-    csv_db_stations_to_insert = []
 
-    for row in reader:
-        csv_db_stations_to_insert.append({
-            "station": row["station"],
-            "latitude": float(row["latitude"]),
-            "longitude": float(row["longitude"]),
-            "elevation": float(row["elevation"]),
-            "name": row["name"],
-            "country": row["country"],
-            "state": row["state"]
-        })
 
-csv_db_measure = 'clean_measure.csv'
+def import_data_from_csv(csv_db_stations, csv_db_measure, conn, stations, measure):
 
-with open(csv_db_measure, newline='', encoding='utf-8') as csv_measure:
-    reader = csv.DictReader(csv_measure)
-    csv_db_measure_to_insert = []
+    with open(csv_db_stations, newline='', encoding='utf-8') as csv_stations:
+        reader = csv.DictReader(csv_stations)
+        csv_db_stations_to_insert = []
 
-    for row in reader:
-        csv_db_measure_to_insert.append({
-            "station": row["station"],
-            "date": datetime.strptime(row["date"], "%Y-%m-%d").date(),
-            "precip": float(row["precip"]),
-            "tobs": int(row["tobs"])
-        })
+        for row in reader:
+            csv_db_stations_to_insert.append({
+                "station": row["station"],
+                "latitude": float(row["latitude"]),
+                "longitude": float(row["longitude"]),
+                "elevation": float(row["elevation"]),
+                "name": row["name"],
+                "country": row["country"],
+                "state": row["state"]
+            })
 
-conn = engine.connect()
-ins = stations.insert()
-conn.execute(ins, csv_db_stations_to_insert)
-print(f"Dodano prawidłowo dane z pliku {csv_db_stations} do tabeli: stations!")
 
-ins = measure.insert()
-conn.execute(ins, csv_db_measure_to_insert)
-print(f"Dodano prawidłowo dane z pliku {csv_db_measure} do tabeli: measure!")
+
+    with open(csv_db_measure, newline='', encoding='utf-8') as csv_measure:
+        reader = csv.DictReader(csv_measure)
+        csv_db_measure_to_insert = []
+
+        for row in reader:
+            csv_db_measure_to_insert.append({
+                "station": row["station"],
+                "date": datetime.strptime(row["date"], "%Y-%m-%d").date(),
+                "precip": float(row["precip"]),
+                "tobs": int(row["tobs"])
+            })
+
+    
+    ins = stations.insert()
+    conn.execute(ins, csv_db_stations_to_insert)
+    print(f"Dodano prawidłowo dane z pliku {csv_db_stations} do tabeli: stations!")
+
+    ins = measure.insert()
+    conn.execute(ins, csv_db_measure_to_insert)
+    print(f"Dodano prawidłowo dane z pliku {csv_db_measure} do tabeli: measure!")
 
 
 if __name__ == "__main__":
+    answer_create_tables = input("Czy chcesz stworzyć tabele o nazwie stations i measure? (T/N): ")
+    if answer_create_tables == "T":
+        engine, conn, stations, measure = create_tables()
+    if answer_create_tables == "N":
+        print("Zamykam program.")
+        exit
+
+
+    csv_db_stations = 'clean_stations.csv'
+    csv_db_measure = 'clean_measure.csv'
+
+    answer_import_data = input("Czy chcesz zaimportować dane z plików 'clean_stations.csv' i 'clean_measure.csv'? (T/N): ")
+    if answer_import_data == "T":
+        import_data_from_csv(csv_db_stations, csv_db_measure, conn, stations, measure)
+    if answer_import_data == "N":
+        print("Zamykam program.")
+        exit
+
+
     while True:
         type_sql = int(input("Podaj rodzaj zapytanie sql wpisując cyfrę: 1 - Select_all, 2 - Select_limit, 3 - Update, 4 - Delete, 5 - Własna treść zapytania, 0 - Zakończ program: "))
         description = ("Select_all" if type_sql == 1 else 
